@@ -1,0 +1,71 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.45);
+  color: #fff;
+  font-family: system-ui, Arial;
+  font-size: 14px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud .hint {
+  opacity: .85;
+  font-size: 12px;
+  margin-top: 6px;
+  max-width: 520px;
+  line-height: 1.2;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-family: system-ui, Arial;
+  z-index: 20;
+}
+
+#overlay .box {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(10,14,30,.85);
+  border: 1px solid rgba(255,255,255,.12);
+  text-align: center;
+  max-width: 420px;
+}
+
+#overlay .title {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+#overlay .text {
+  opacity: .9;
+  margin-top: 6px;
+}
+
+#overlay .small {
+  opacity: .7;
+  font-size: 12px;
+}
