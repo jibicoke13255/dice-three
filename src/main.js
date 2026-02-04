@@ -9,14 +9,6 @@ import feltUrl from "./assets/felt.jpg";
 import woodUrl from "./assets/wood.jpg";
 
 document.addEventListener("contextmenu", (e) => e.preventDefault(), { capture: true });
-window.oncontextmenu = (e) => e.preventDefault();
-
-// ------- Device detection (simple) -------
-const isTouchDevice =
-  ("ontouchstart" in window) ||
-  (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
-
-const isMobileLike = isTouchDevice || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
 // ------- Container Vite (#app) -------
 const app = document.getElementById("app");
@@ -27,38 +19,12 @@ const hud = document.createElement("div");
 hud.id = "hud";
 hud.innerHTML = `
   <div><b>Résultat :</b> <span id="result">—</span></div>
-  <div class="hint" id="hint"></div>
+  <div class="hint">Clique pour activer le FPS • WASD déplacer • Espace/Ctrl haut/bas • R relance le dé</div>
 `;
 document.body.appendChild(hud);
 const resultEl = document.getElementById("result");
-const hintEl = document.getElementById("hint");
 
-// ------- Intro Menu -------
-const intro = document.createElement("div");
-intro.id = "intro";
-intro.innerHTML = `
-  <div class="panel">
-    <div class="title">Jeu de Dé</div>
-    <div class="subtitle">Lancer un dé dans un bac de feutrine</div>
-
-    <div class="section" id="controlsSection"></div>
-
-    <div class="buttons">
-      <button id="btnStart">Commencer</button>
-      <button id="btnThrow" class="secondary">Lancer</button>
-    </div>
-
-    <div class="foot" id="footNote"></div>
-  </div>
-`;
-document.body.appendChild(intro);
-
-const btnStart = intro.querySelector("#btnStart");
-const btnThrow = intro.querySelector("#btnThrow");
-const controlsSection = intro.querySelector("#controlsSection");
-const footNote = intro.querySelector("#footNote");
-
-// ------- Overlay FPS (PC only) -------
+// ------- Overlay FPS -------
 const overlay = document.createElement("div");
 overlay.id = "overlay";
 overlay.innerHTML = `
@@ -72,13 +38,14 @@ document.body.appendChild(overlay);
 
 // ---------- BAC CIRCULAIRE ----------
 const tray = {
-  rInner: 2.6,
-  wallT: 0.28,
-  wallH: 0.75,
-  floorT: 0.22,
-  y: 1.05,
-  segments: 64,
+  rInner: 2.6,     // rayon intérieur (zone feutrine)
+  wallT: 0.28,     // épaisseur paroi
+  wallH: 0.75,     // hauteur paroi
+  floorT: 0.22,    // épaisseur du fond
+  y: 1.05,         // niveau du dessus du fond/feutrine
+  segments: 64,    // finesse visuelle & mur physique
 };
+
 const rOuter = tray.rInner + tray.wallT;
 
 // Caméra de départ (vue d'ensemble)
@@ -98,12 +65,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+// Ombres
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-app.appendChild(renderer.domElement);
 
-// Empêche le scroll / zoom “page” pendant le jeu sur mobile
-renderer.domElement.style.touchAction = "none";
+app.appendChild(renderer.domElement);
 
 // Reflets réalistes
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -128,87 +95,24 @@ scene.add(dir);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
-// ------- Controls (PointerLock for PC only) -------
+// ------- FPS Controls -------
 const controls = new PointerLockControls(camera, renderer.domElement);
 scene.add(controls.object);
 controls.object.position.set(0, tray.y + startHeight, startDist);
 controls.object.lookAt(0, tray.y, 0);
 
-// UI text per device
-if (isMobileLike) {
-  hintEl.textContent = "Mobile : tap n’importe où pour relancer le dé";
-  controlsSection.innerHTML = `
-    <div class="label">Commandes (mobile)</div>
-    <ul>
-      <li><b>Tap</b> sur l’écran : relancer le dé</li>
-    </ul>
-  `;
-  footNote.textContent = "Astuce : une fois dans le jeu, touche l’écran pour relancer.";
-  overlay.style.display = "none";
-} else {
-  hintEl.textContent = "PC : Clique pour activer FPS • WASD • Souris • Espace/Ctrl • R";
-  controlsSection.innerHTML = `
-    <div class="label">Commandes (PC)</div>
-    <ul>
-      <li><b>W</b> avancer • <b>S</b> reculer • <b>A</b>/<b>D</b> gauche/droite</li>
-      <li><b>Souris</b> : regarder autour</li>
-      <li><b>Espace</b> monter • <b>Ctrl</b> descendre</li>
-      <li><b>R</b> : relancer le dé</li>
-      <li><b>Échap</b> : libérer la souris</li>
-    </ul>
-  `;
-  footNote.textContent = "Clique sur “Commencer” pour activer le mode FPS.";
-  overlay.style.display = "flex";
-}
-
-// Intro menu behavior
-let gameStarted = false;
-
-// PC pointer lock UX
-overlay.addEventListener("click", () => {
-  if (!isMobileLike) controls.lock();
-});
-
-controls.addEventListener("lock", () => {
-  overlay.style.display = "none";
-});
-controls.addEventListener("unlock", () => {
-  if (gameStarted && !isMobileLike) overlay.style.display = "flex";
-});
+overlay.addEventListener("click", () => controls.lock());
+renderer.domElement.addEventListener("click", () => controls.lock());
+controls.addEventListener("lock", () => (overlay.style.display = "none"));
+controls.addEventListener("unlock", () => (overlay.style.display = "flex"));
 
 document.addEventListener("pointerlockerror", () => {
-  if (!isMobileLike) {
-    overlay.querySelector(".text").textContent =
-      "Pointer Lock refusé. Clique dans la page et réessaie (pas dans la console F12).";
-    overlay.style.display = "flex";
-  }
+  overlay.querySelector(".text").textContent =
+    "Pointer Lock refusé. Clique dans la page et réessaie (pas dans la console F12).";
+  overlay.style.display = "flex";
 });
 
-btnStart.addEventListener("click", () => {
-  intro.style.display = "none";
-  gameStarted = true;
-
-  if (!isMobileLike) {
-    overlay.style.display = "flex";
-    controls.lock();
-  } else {
-    // Sur mobile, rien à “locker”
-    // On laisse la caméra fixe (vue d'ensemble) + tap pour relancer
-  }
-});
-
-btnThrow.addEventListener("click", () => {
-  intro.style.display = "none";
-  gameStarted = true;
-
-  if (!isMobileLike) {
-    overlay.style.display = "flex";
-    controls.lock();
-  }
-  setTimeout(() => throwDice(), 50);
-});
-
-// ------- Keyboard input (PC only) -------
+// ------- Input (WASD + Space/Ctrl) -------
 const keys = { forward:false, backward:false, left:false, right:false, up:false, down:false };
 
 function setKey(e, isDown) {
@@ -224,39 +128,15 @@ function setKey(e, isDown) {
 }
 
 window.addEventListener("keydown", (e) => {
-  if (!gameStarted) return;
-  if (isMobileLike) return;
-
   setKey(e, true);
   if (e.code === "KeyR") throwDice();
   if (e.code === "Space") e.preventDefault();
 }, { passive: false });
 
-window.addEventListener("keyup", (e) => {
-  if (isMobileLike) return;
-  setKey(e, false);
-});
+window.addEventListener("keyup", (e) => setKey(e, false));
 
 const moveSpeed = 5.5;
 const verticalSpeed = 4.5;
-
-// ------- Mobile: tap anywhere to throw (single tap) -------
-let lastTapMs = 0;
-function mobileTapThrow() {
-  if (!gameStarted) return;
-  const now = performance.now();
-  // anti double-tap / ghost clicks
-  if (now - lastTapMs < 250) return;
-  lastTapMs = now;
-  throwDice();
-}
-
-// On capte pointerdown sur le canvas
-renderer.domElement.addEventListener("pointerdown", (e) => {
-  if (!isMobileLike) return;
-  e.preventDefault();
-  mobileTapThrow();
-}, { passive: false });
 
 // ---------- Textures bac (bois + feutrine) ----------
 const texLoader = new THREE.TextureLoader();
@@ -295,7 +175,7 @@ scene.add(trayGroup);
   trayGroup.add(mesh);
 }
 
-// 2) Paroi SOLIDE (anneau extrudé)
+// 2) Paroi SOLIDE (anneau extrudé) => plus de "vide" dans l'épaisseur
 {
   const wallShape = new THREE.Shape();
   wallShape.absarc(0, 0, rOuter, 0, Math.PI * 2, false);
@@ -318,7 +198,7 @@ scene.add(trayGroup);
   wall.receiveShadow = true;
   trayGroup.add(wall);
 
-  // Rebord arrondi
+  // Rebord arrondi (optionnel, joli)
   const rimGeo = new THREE.TorusGeometry(rOuter - tray.wallT * 0.35, tray.wallT * 0.22, 16, tray.segments);
   const rim = new THREE.Mesh(rimGeo, trayWoodMat);
   rim.rotation.x = Math.PI / 2;
@@ -328,7 +208,7 @@ scene.add(trayGroup);
   trayGroup.add(rim);
 }
 
-// 3) Feutrine dynamique (image + chiffre)
+// 3) Feutrine dynamique (image + chiffre au centre)
 const feltCanvas = document.createElement("canvas");
 feltCanvas.width = 1024;
 feltCanvas.height = 1024;
@@ -351,10 +231,12 @@ function drawFeltBase() {
   const w = feltCanvas.width;
   const h = feltCanvas.height;
 
+  // fallback
   feltCtx.clearRect(0, 0, w, h);
   feltCtx.fillStyle = "#2f7f66";
   feltCtx.fillRect(0, 0, w, h);
 
+  // motif feutrine si dispo
   const img = feltTex.image;
   if (img && img.width) {
     const pattern = feltCtx.createPattern(img, "repeat");
@@ -371,7 +253,7 @@ function drawFeltResult(value) {
 
   drawFeltBase();
 
-  // stamp centre
+  // cercle léger au centre (style "stamp")
   feltCtx.save();
   feltCtx.beginPath();
   feltCtx.arc(w / 2, h / 2, w * 0.18, 0, Math.PI * 2);
@@ -389,12 +271,15 @@ function drawFeltResult(value) {
     feltCtx.textAlign = "center";
     feltCtx.textBaseline = "middle";
 
-    feltCtx.font = `900 340px system-ui, Arial`;
+    const fontSize = 340;
+    feltCtx.font = `900 ${fontSize}px system-ui, Arial`;
 
+    // contour clair
     feltCtx.lineWidth = 22;
     feltCtx.strokeStyle = "rgba(255,255,255,0.70)";
     feltCtx.strokeText(txt, w / 2, h / 2);
 
+    // remplissage sombre + ombre
     feltCtx.fillStyle = "rgba(15,15,15,0.65)";
     feltCtx.shadowColor = "rgba(0,0,0,0.45)";
     feltCtx.shadowBlur = 24;
@@ -407,6 +292,7 @@ function drawFeltResult(value) {
   feltDynamicTex.needsUpdate = true;
 }
 
+// init texture feutrine + résultat "—"
 drawFeltResult("—");
 
 const felt = new THREE.Mesh(
@@ -418,7 +304,7 @@ felt.position.set(0, tray.y + 0.001, 0);
 felt.receiveShadow = true;
 trayGroup.add(felt);
 
-// ---------- Dé : textures pips ----------
+// ---------- Dé : textures pips (1..6) ----------
 function makePipFaceTexture(pips, opts = {}) {
   const size = opts.size ?? 1024;
   const bg = opts.bg ?? "#f4f2ec";
@@ -429,6 +315,7 @@ function makePipFaceTexture(pips, opts = {}) {
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
 
+  // Fond
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, size, size);
 
@@ -443,14 +330,20 @@ function makePipFaceTexture(pips, opts = {}) {
   }
   ctx.putImageData(img, 0, 0);
 
+  // Bord doux
   const pad = Math.floor(size * 0.06);
   ctx.lineWidth = Math.max(10, Math.floor(size * 0.03));
   ctx.strokeStyle = border;
   ctx.strokeRect(pad, pad, size - pad * 2, size - pad * 2);
 
+  // Positions pips (grille 3x3)
   const g = {
-    L: size * 0.28, C: size * 0.50, R: size * 0.72,
-    T: size * 0.28, M: size * 0.50, B: size * 0.72,
+    L: size * 0.28,
+    C: size * 0.50,
+    R: size * 0.72,
+    T: size * 0.28,
+    M: size * 0.50,
+    B: size * 0.72,
   };
 
   const pipMap = {
@@ -465,6 +358,7 @@ function makePipFaceTexture(pips, opts = {}) {
   ctx.fillStyle = pipColor;
   const r = size * 0.055;
 
+  // Ombre légère pour relief
   ctx.shadowColor = "rgba(0,0,0,0.25)";
   ctx.shadowBlur = size * 0.015;
   ctx.shadowOffsetY = size * 0.008;
@@ -483,6 +377,7 @@ function makePipFaceTexture(pips, opts = {}) {
 }
 
 // Ordre faces : +X, -X, +Y, -Y, +Z, -Z
+// Disposition réaliste : +Y=1, -Y=6, +Z=2, -Z=5, +X=3, -X=4
 const pipsByFace = [3, 4, 1, 6, 2, 5];
 
 const faceMaterials = pipsByFace.map((p) => new THREE.MeshPhysicalMaterial({
@@ -494,6 +389,7 @@ const faceMaterials = pipsByFace.map((p) => new THREE.MeshPhysicalMaterial({
   ior: 1.45,
 }));
 
+// Dé réaliste
 const diceSize = 0.65;
 const diceSegs = 8;
 const diceRadius = diceSize * 0.06;
@@ -516,6 +412,7 @@ world.addContactMaterial(new CANNON.ContactMaterial(matFloor, matDice, {
   restitution: 0.18,
 }));
 
+// ---------- BAC CIRCULAIRE (CANNON) : fond + mur circulaire segmenté ----------
 const trayBody = new CANNON.Body({ mass: 0, material: matFloor });
 
 // Fond (box)
@@ -524,7 +421,7 @@ const trayBody = new CANNON.Body({ mass: 0, material: matFloor });
   trayBody.addShape(floorShape, new CANNON.Vec3(0, tray.y - tray.floorT / 2, 0));
 }
 
-// Mur circulaire segmenté
+// Mur circulaire en segments (boxes)
 {
   const N = tray.segments;
   const wallRadius = tray.rInner + tray.wallT / 2;
@@ -598,6 +495,7 @@ function throwDice() {
   lastTop = null;
 }
 
+// Normales locales (ordre faces)
 const faceNormalsLocal = [
   new THREE.Vector3(1, 0, 0),
   new THREE.Vector3(-1, 0, 0),
@@ -634,36 +532,12 @@ const clock = new THREE.Clock();
 let accumulator = 0;
 const fixedTimeStep = 1 / 60;
 
+throwDice();
+
 const moveDir = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
 const upVec = new THREE.Vector3(0, 1, 0);
-
-function applyDesktopMovement(dt) {
-  const step = moveSpeed * dt;
-
-  controls.getDirection(forward);
-  forward.y = 0;
-  forward.normalize();
-
-  right.copy(forward).cross(upVec).normalize();
-
-  moveDir.set(0, 0, 0);
-  if (keys.forward) moveDir.add(forward);
-  if (keys.backward) moveDir.sub(forward);
-  if (keys.right) moveDir.add(right);
-  if (keys.left) moveDir.sub(right);
-
-  if (moveDir.lengthSq() > 0) {
-    moveDir.normalize().multiplyScalar(step);
-    controls.object.position.add(moveDir);
-  }
-
-  if (keys.up) controls.object.position.y += verticalSpeed * dt;
-  if (keys.down) controls.object.position.y -= verticalSpeed * dt;
-
-  controls.object.position.y = Math.max(0.6, controls.object.position.y);
-}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -676,9 +550,11 @@ function animate() {
     accumulator -= fixedTimeStep;
   }
 
+  // sync mesh <- body
   diceMesh.position.copy(diceBody.position);
   diceMesh.quaternion.copy(diceBody.quaternion);
 
+  // Résultat
   if (rolling) {
     if (isNearlyStopped()) {
       stableFrames++;
@@ -696,9 +572,31 @@ function animate() {
     }
   }
 
-  // PC movement only (and only when pointer lock is active)
-  if (gameStarted && !isMobileLike && controls.isLocked) {
-    applyDesktopMovement(dt);
+  // Movement FPS
+  if (controls.isLocked) {
+    const step = moveSpeed * dt;
+
+    controls.getDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    right.copy(forward).cross(upVec).normalize();
+
+    moveDir.set(0, 0, 0);
+    if (keys.forward) moveDir.add(forward);
+    if (keys.backward) moveDir.sub(forward);
+    if (keys.right) moveDir.add(right);
+    if (keys.left) moveDir.sub(right);
+
+    if (moveDir.lengthSq() > 0) {
+      moveDir.normalize().multiplyScalar(step);
+      controls.object.position.add(moveDir);
+    }
+
+    if (keys.up) controls.object.position.y += verticalSpeed * dt;
+    if (keys.down) controls.object.position.y -= verticalSpeed * dt;
+
+    controls.object.position.y = Math.max(0.6, controls.object.position.y);
   }
 
   renderer.render(scene, camera);
